@@ -1,0 +1,19 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# pycharm
+.idea
+
+# vcards
+*.vcf
+
+# csvs
+*.csv
+
+export
+dist
+MANIFEST
+build
+*egg-info
