@@ -100,7 +100,7 @@ print(data.header)
 ```
 
 
-<p><em>For more examples and usage, please refer to the <a href="https://github.com/hoosiki/csv2sqlLike/samples/examples.ipynb">jupyter notebook</a>.</em></p>
+<p><em>For more examples and usage, please refer to the <a href="https://github.com/hoosiki/csv2sqlLike/blob/master/samples/examples.ipynb">jupyter notebook</a>.</em></p>
 <h2 id="release-history">Release History</h2>
 <ul>
 <li>1.0.0<ul>

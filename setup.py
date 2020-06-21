@@ -9,5 +9,5 @@ setup(
         'csv',
         'pymysql'
     ]
-    download_url='https://github.com/hoosiki/csv2sqlLike
+    download_url='https://github.com/hoosiki/csv2sqlLike/blob/master/dist/csv2sqllike-1.0.0.tar.gz'
 )
