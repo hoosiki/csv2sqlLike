@@ -1,4 +1,4 @@
-<h1 id="2b6aba2c8ec2f8b0"><u>csv2sqlLike</u></h1>
+<h1 id="2b6aba2c8ec2f8b0">csv2sqlLike</h1>
 <blockquote>
 <p>csv2sqlLike is a package for simple data analysis using light data set(&lt;30MB). This package has filtering method similar with sql's filtering functions. Hope this package could be helpful for who analyze data in social science.</p>
 </blockquote>
