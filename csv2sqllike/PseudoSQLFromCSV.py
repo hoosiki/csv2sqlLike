@@ -8,13 +8,13 @@ from dateutil.parser import parse
 
 class PsuedoSQLFromCSV(object):
 
-    def __init__(self, file_path, sep=",", type_dict=None):
-        if self.__check_shape(file_path, sep):
+    def __init__(self, file_path, sep=",", type_dict=None, encoding='utf-8'):
+        if self.__check_shape(file_path, sep, encoding=encoding):
             self.__effective_header, header_num = self.__get_effective_headers_number(file_path, sep)
         else:
             self.__effective_header = None
 
-        with open(file_path, "r") as file:
+        with open(file_path, "r", encoding=encoding) as file:
             self.__original_data = list(csv.reader(file))
             self.__original_data[0] = list("_".join(x.lower().split(" ")) for x in self.__original_data[0])
 
@@ -35,22 +35,22 @@ class PsuedoSQLFromCSV(object):
         for i in range(min(len(self.__original_data), 5)):
             print(self.__original_data[i])
 
-    def save_data_to_csv(self, file_path):
-        tmp_file = open(file_path, "w")
+    def save_data_to_csv(self, file_path, encoding='utf-8'):
+        tmp_file = open(file_path, "w", encoding=encoding)
         tmp_writer = csv.writer(tmp_file)
         tmp_writer.writerow(self.__header)
         tmp_writer.writerows(self.__data)
         tmp_file.close()
 
     @staticmethod
-    def __get_effective_headers_number(file_path, sep=","):
-        with open(file_path, "r") as file:
+    def __get_effective_headers_number(file_path, sep=",", encoding='utf-8'):
+        with open(file_path, "r", encoding=encoding) as file:
             tmp_list = list("_".join(x.lower().strip().split(" ")) for x in file.readline().split(sep) if x != "")
         return tmp_list, len(tmp_list)
 
-    def __check_shape(self, file_path, sep=","):
+    def __check_shape(self, file_path, sep=",", encoding='utf-8'):
         headers, num_headers = self.__get_effective_headers_number(file_path, sep)
-        with open(file_path, "r") as file:
+        with open(file_path, "r", encoding=encoding) as file:
             for line, data in enumerate(file):
                 if len(data.split(sep)) != num_headers:
                     regex = re.compile(r',"(.*)",')

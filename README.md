@@ -106,6 +106,9 @@ print(data.header)
 <li>1.0.0<ul>
 <li>First release</li>
 </ul>
+<li>1.0.1<ul>
+<li>Add encoding option(default is utf-8)</li>
+</ul>
 </ul>
 <!-- Markdown link & img dfn's -->
 

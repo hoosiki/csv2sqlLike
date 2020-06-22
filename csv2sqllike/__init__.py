@@ -15,8 +15,8 @@ from .PseudoSQLFromCSV import PsuedoSQLFromCSV
 from .Transfer2SQLDB import Transfer2SQLDB
 
 
-def get_data_from_csv(file_path, sep=',', type_dict=None):
-    pseudo = PsuedoSQLFromCSV(file_path, sep, type_dict)
+def get_data_from_csv(file_path, sep=',', type_dict=None, encoding='utf-8'):
+    pseudo = PsuedoSQLFromCSV(file_path, sep, type_dict, encoding)
     return pseudo
 
 
