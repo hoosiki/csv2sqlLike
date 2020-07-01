@@ -107,7 +107,13 @@ print(data.header)
 <li>First release</li>
 </ul>
 <li>1.0.1<ul>
-<li>Add encoding option(default is utf-8)</li>
+<li>Add encoding option(default encode is utf-8)</li>
+</ul>
+<li>1.0.2<ul>
+<li>Add auto installing for required package</li>
+</ul>
+<li>1.0.3<ul>
+<li>Improve precision on data shape check function</li>
 </ul>
 </ul>
 <!-- Markdown link & img dfn's -->

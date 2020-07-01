@@ -53,7 +53,7 @@ class PsuedoSQLFromCSV(object):
         with open(file_path, "r", encoding=encoding) as file:
             for line, data in enumerate(file):
                 if len(data.split(sep)) != num_headers:
-                    regex = re.compile(r',"(.*)",')
+                    regex = re.compile(r',"(.*?)",')
                     tmp_mo = regex.findall(data)
                     if len(tmp_mo) != 0:
                         for pattern in tmp_mo:
