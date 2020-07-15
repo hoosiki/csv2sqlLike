@@ -3,12 +3,13 @@ import datetime
 import re
 import copy
 import statistics
+from tqdm import tqdm
 from dateutil.parser import parse
 
 
 class PsuedoSQLFromCSV(object):
 
-    def __init__(self, file_path, sep=",", type_dict=None, encoding='utf-8'):
+    def __init__(self, file_path, sep=",", dtype=None, encoding='utf-8'):
         if self.__check_shape(file_path, sep, encoding=encoding):
             self.__effective_header, header_num = self.__get_effective_headers_number(file_path, sep)
         else:
@@ -18,10 +19,10 @@ class PsuedoSQLFromCSV(object):
             self.__original_data = list(csv.reader(file))
             self.__original_data[0] = list("_".join(x.lower().split(" ")) for x in self.__original_data[0])
 
-        if type_dict is None:
+        if dtype is None:
             self.__header_data_type_dict = self.__get_header_data_type_dict(self.__effective_header)
         else:
-            self.__header_data_type_dict = type_dict
+            self.__header_data_type_dict = dtype
         self.__make_proper_type(self.__header_data_type_dict);
         self.__header = self.__original_data[0]
         self.__data = self.__original_data[1:]
@@ -122,7 +123,7 @@ class PsuedoSQLFromCSV(object):
         return tmp_dict
 
     def __make_proper_type(self, input_dict):
-        for key in input_dict.keys():
+        for key in tqdm(input_dict.keys()):
             if input_dict[key] == "str":
                 continue
             tmp_index = self.__original_data[0].index(key)
@@ -318,11 +319,11 @@ class PsuedoSQLFromCSV(object):
         return self.__cache_data
 
     @property
-    def data_type(self):
+    def dtype(self):
         return self.__header_data_type_dict
 
-    @data_type.setter
-    def data_type(self, data_type):
+    @dtype.setter
+    def dtype(self, data_type):
         self.__header_data_type_dict = data_type
 
     @property

@@ -14,11 +14,19 @@ with open('README.md') as readme_file:
 install_requireent = []
 
 setup_requires = [
-        'pymysql'
+        'pymysql',
+        'pandas',
+        'tqdm',
+        'mysqlclient',
+        'sqlalchemy'
         ]
 
 install_requires = [
-        'pymysql'
+        'pymysql',
+        'pandas',
+        'tqdm',
+        'mysqlclient',
+        'sqlalchemy'
         ]
 
 setup(
