@@ -26,7 +26,7 @@ class Transfer2SQLDB(object):
             data_base_info["host"] + ':' + \
             str(data_base_info["port"]) + '/' + \
             data_base_info["db"] + '?charset=utf8'
-        self.__connect_for_pd = create_engine(tmp_db_info)
+        #self.__connect_for_pd = create_engine(tmp_db_info)
 
     def delete_table(self, table_name):
         tmp_command = "drop table " + table_name
