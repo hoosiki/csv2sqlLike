@@ -1,5 +1,6 @@
 import pymysql
 import pandas as pd
+from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import create_engine
 
@@ -22,10 +23,10 @@ class Transfer2SQLDB(object):
         self.__cursor = self.__db.cursor(pymysql.cursors.DictCursor)
         self.__field_type_dict = None
 
-        tmp_db_info = 'mysql+mysqldb://' + data_base_info["user"] + ':' + data_base_info["password"] + '@' + \
+        tmp_db_info = 'mysql+mysqlconnector://' + data_base_info["user"] + ':' + data_base_info["password"] + '@' + \
             data_base_info["host"] + ':' + \
             str(data_base_info["port"]) + '/' + \
-            data_base_info["db"] + '?charset=utf8'
+            data_base_info["db"] + '?charset=UTF8'
         self.__connect_for_pd = create_engine(tmp_db_info)
 
     def delete_table(self, table_name):
@@ -34,22 +35,24 @@ class Transfer2SQLDB(object):
         print("Succeed to delete", table_name)
 
     def show_tables(self):
+        tmp_list = list()
         tmp_command = "show tables;"
         self.__cursor.execute(tmp_command)
         for x in self.__cursor.fetchall():
-            print(x["Tables_in_" + self.__db.db.decode("utf-8")])
-            
-    def create_table(self, table_name, input_pseudosql_or_df, field_type_dict=None, if_exists="replace", index=False, dtype=None):
+            tmp_list.append(x["Tables_in_" + self.__db.db.decode("utf-8")])
+        return tmp_list
+
+    def create_table(self, table_name, input_pseudosql_or_df, if_exists="replace", index=False, dtype=None):
 
         if type(input_pseudosql_or_df) == type(pd.DataFrame()):
             input_pseudosql_or_df.to_sql(
                 con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype)
 
         else:
-            if field_type_dict is None:
+            if dtype is None:
                 self.__set_field_type_dict(input_pseudosql_or_df)
             else:
-                self.__field_type_dict = field_type_dict
+                self.__field_type_dict = dtype
 
             tmp_command = self.__get_create_table_command(
                 table_name, self.__field_type_dict)
@@ -76,9 +79,13 @@ class Transfer2SQLDB(object):
                 con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype)
         else:
             self.__get_data_type(table_name)
-            self.__insert_data(table_name, input_pseudosql_or_df.data)
-            
-    def __insert_data(self, input_table_name, data_list):
+            self.__insert_data(table_name, input_pseudosql_or_df)
+
+    def __insert_data(self, input_table_name, input_pseudosql_or_df):
+
+        if len(self.__field_type_dict) == 0:
+            self.__set_field_type_dict(input_pseudosql_or_df)
+
         tmp_char_type_list = [x for x in self.__field_type_dict.keys(
         ) if "CHAR" in self.__field_type_dict[x]]
         tmp_header_list = [x for x in self.__field_type_dict.keys()]
@@ -96,10 +103,10 @@ class Transfer2SQLDB(object):
 
         print(result_str)
 
-        self.__cursor.executemany(result_str, data_list)
+        self.__cursor.executemany(result_str, input_pseudosql_or_df.data)
 
     def __set_field_type_dict(self, input_pseudosql):
-        if self.__field_type_dict is None:
+        if self.__field_type_dict is None or len(self.__field_type_dict) == 0:
             tmp_dict = dict()
             data_type_dict = input_pseudosql.dtype
             for key in data_type_dict.keys():
@@ -120,16 +127,30 @@ class Transfer2SQLDB(object):
                 elif data_type_dict[key] == "int":
                     tmp_dict[key] = "INT"
             self.__field_type_dict = tmp_dict
-    
+
     def __get_data_type(self, table_name):
         self.execute("SHOW FIELDS FROM " + table_name)
         tmp_list = self.__cursor.fetchall()
         self.__field_type_dict = dict()
         for tmp_dict in tmp_list:
             self.__field_type_dict[tmp_dict["Field"]] = tmp_dict["Type"]
-            
+
         return self.__field_type_dict
-        
+
+    def __check_if_exist(self, table_name: str) -> bool:
+        if table_name in self.show_tables():
+            return True
+        else:
+            return False
+
+    def __write_meta_table_meta_info(self, table_name: str) -> None:
+        tmp_now = datetime.now()
+        tmp_etc = ""
+        if self.__check_if_exist(table_name):
+            tmp_etc = "modify"
+        else:
+            tmp_etc = "create"
+        # tmp_before_line =
 
     @staticmethod
     def __get_create_table_command(table_name, header_type_dict):
@@ -157,11 +178,10 @@ class Transfer2SQLDB(object):
     @property
     def dtype(self):
         return self.__field_type_dict
-    
+
     @dtype.setter
     def dtype(self, input_dtype_dict):
         self.__field_type_dict = input_dtype_dict
-    
 
     @property
     def data_base_info(self):
