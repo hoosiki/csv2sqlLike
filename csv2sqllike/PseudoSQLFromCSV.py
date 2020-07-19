@@ -9,21 +9,24 @@ from dateutil.parser import parse
 
 class PsuedoSQLFromCSV(object):
 
-    def __init__(self, file_path, sep=",", dtype=None, encoding='utf-8'):
+    def __init__(self, file_path: str, sep=",", dtype=None, encoding='utf-8'):
         if self.__check_shape(file_path, sep, encoding=encoding):
-            self.__effective_header, header_num = self.__get_effective_headers_number(file_path, sep)
+            self.__effective_header, header_num = self.__get_effective_headers_number(
+                file_path, sep)
         else:
             self.__effective_header = None
 
         with open(file_path, "r", encoding=encoding) as file:
             self.__original_data = list(csv.reader(file))
-            self.__original_data[0] = list("_".join(x.lower().split(" ")) for x in self.__original_data[0])
+            self.__original_data[0] = list(
+                "_".join(x.lower().split(" ")) for x in self.__original_data[0])
 
         if dtype is None:
-            self.__header_data_type_dict = self.__get_header_data_type_dict(self.__effective_header)
+            self.__header_data_type_dict = self.__get_header_data_type_dict(
+                self.__effective_header)
         else:
             self.__header_data_type_dict = dtype
-        self.__make_proper_type(self.__header_data_type_dict);
+        self.__make_proper_type(self.__header_data_type_dict)
         self.__header = self.__original_data[0]
         self.__data = self.__original_data[1:]
         self.__cache_data = self.__data
@@ -36,7 +39,7 @@ class PsuedoSQLFromCSV(object):
         for i in range(min(len(self.__original_data), 5)):
             print(self.__original_data[i])
 
-    def save_data_to_csv(self, file_path, encoding='utf-8'):
+    def save_data_to_csv(self, file_path: str, encoding='utf-8') -> None:
         tmp_file = open(file_path, "w", encoding=encoding)
         tmp_writer = csv.writer(tmp_file)
         tmp_writer.writerow(self.__header)
@@ -46,11 +49,13 @@ class PsuedoSQLFromCSV(object):
     @staticmethod
     def __get_effective_headers_number(file_path, sep=",", encoding='utf-8'):
         with open(file_path, "r", encoding=encoding) as file:
-            tmp_list = list("_".join(x.lower().strip().split(" ")) for x in file.readline().split(sep) if x != "")
+            tmp_list = list("_".join(x.lower().strip().split(" "))
+                            for x in file.readline().split(sep) if x != "")
         return tmp_list, len(tmp_list)
 
     def __check_shape(self, file_path, sep=",", encoding='utf-8'):
-        headers, num_headers = self.__get_effective_headers_number(file_path, sep)
+        headers, num_headers = self.__get_effective_headers_number(
+            file_path, sep)
         with open(file_path, "r", encoding=encoding) as file:
             for line, data in enumerate(file):
                 if len(data.split(sep)) != num_headers:
@@ -64,9 +69,9 @@ class PsuedoSQLFromCSV(object):
                         print("Line", line + 1, "does not have consistant columns with", num_headers, "headers.",
                               "This line has", len(data.split(sep)), "elements.")
                         return False
-        return True;
+        return True
 
-    def delete_head(self, head):
+    def delete_head(self, head: str) -> None:
         tmp_head = "_".join(head.lower().split(" "))
         if tmp_head in self.__header:
             tmp_index = self.__header.index(tmp_head)
@@ -77,7 +82,7 @@ class PsuedoSQLFromCSV(object):
         else:
             print("No head called", tmp_head)
 
-    def add_head(self, head):
+    def add_head(self, head: str) -> None:
         tmp_head = "_".join(head.lower().split(" "))
         if tmp_head not in self.__header:
             self.__header.append(tmp_head)
@@ -110,7 +115,8 @@ class PsuedoSQLFromCSV(object):
                 tmp_str = tmp_header.ljust(100)
 
             print(tmp_str)
-            tmp_type = input('insert type(default type is str. options[" ":str, "1":int, "2":float, "3":date] : ')
+            tmp_type = input(
+                'insert type(default type is str. options[" ":str, "1":int, "2":float, "3":date] : ')
             if tmp_type == "":
                 tmp_dict[tmp_header] = "str"
             else:
@@ -136,7 +142,8 @@ class PsuedoSQLFromCSV(object):
                                                                                        self.__original_data[line_num][
                                                                                            tmp_index])
                     except Exception as e:
-                        print("Line", line_num + 1, "seems no proper data type")
+                        print("Line", line_num + 1,
+                              "seems no proper data type")
                         print(e)
 
     @staticmethod
@@ -145,19 +152,21 @@ class PsuedoSQLFromCSV(object):
                         str=lambda x: x)
         return tmp_dict[input_type](ori_data)
 
-    def where(self, condition):
+    def where(self, condition: str):
         if condition in self.__where_conditions:
             return self
 
         tmp_list = condition.split(" ")
         if len(tmp_list) < 3:
-            print("Condition :", condition, "is not proper format for where function.")
+            print("Condition :", condition,
+                  "is not proper format for where function.")
             pass
         tmp_header = tmp_list[0]
         tmp_operator = tmp_list[1]
         tmp_compared_obj = " ".join(tmp_list[2:])
         try:
-            tmp_compared_obj = self.__switch_type(self.__header_data_type_dict[tmp_header], tmp_compared_obj)
+            tmp_compared_obj = self.__switch_type(
+                self.__header_data_type_dict[tmp_header], tmp_compared_obj)
         except Exception as e:
             print("Failed to convert condition :", condition)
             print(e)
@@ -175,7 +184,7 @@ class PsuedoSQLFromCSV(object):
             self.__where_conditions += " AND " + condition
         return self
 
-    def group_by(self, input_header):
+    def group_by(self, input_header: str):
 
         if input_header not in self.__header:
             print(input_header, "is not included in header")
@@ -213,7 +222,7 @@ class PsuedoSQLFromCSV(object):
                 del self.__group_by_dict[key]
         return self
 
-    def aggregate_sum(self, input_header):
+    def aggregate_sum(self, input_header: str) -> None:
         if input_header not in self.__header:
             print(input_header, "is not included header")
             return None
@@ -226,7 +235,7 @@ class PsuedoSQLFromCSV(object):
             self.__aggregate_operation_dict[key + " || SUM"] = sum(
                 self.__extract_list_specific_header(input_header, self.__group_by_dict[key]))
 
-    def aggregate_count(self, input_header):
+    def aggregate_count(self, input_header: str) -> None:
         if input_header not in self.__header:
             print(input_header, "is not included header")
             return None
@@ -239,36 +248,44 @@ class PsuedoSQLFromCSV(object):
             self.__aggregate_operation_dict[key + " || COUNT"] = len(
                 self.__extract_list_specific_header(input_header, self.__group_by_dict[key]))
 
-    def aggregate_avg(self, input_header):
+    def aggregate_avg(self, input_header: str) -> None:
         if input_header not in self.__header:
             print(input_header, "is not included header")
             return None
 
         tmp_str = "No grouped || AVG"
-        tmp_list = self.__extract_list_specific_header(input_header, self.__cache_data)
+        tmp_list = self.__extract_list_specific_header(
+            input_header, self.__cache_data)
         if len(tmp_list) != 0:
-            self.__aggregate_operation_dict[tmp_str] = statistics.mean(tmp_list)
+            self.__aggregate_operation_dict[tmp_str] = statistics.mean(
+                tmp_list)
 
         for key in self.__group_by_dict.keys():
-            tmp_list = self.__extract_list_specific_header(input_header, self.__group_by_dict[key])
+            tmp_list = self.__extract_list_specific_header(
+                input_header, self.__group_by_dict[key])
             if len(tmp_list) != 0:
-                self.__aggregate_operation_dict[key + " || AVG"] = statistics.mean(tmp_list)
+                self.__aggregate_operation_dict[key
+                                                + " || AVG"] = statistics.mean(tmp_list)
 
     def aggregate_std(self, input_header):
         if input_header not in self.__header:
             print(input_header, "is not included header")
             return None
         tmp_str = "No grouped || STD"
-        tmp_list = self.__extract_list_specific_header(input_header, self.__cache_data)
+        tmp_list = self.__extract_list_specific_header(
+            input_header, self.__cache_data)
         if len(tmp_list) != 0:
-            self.__aggregate_operation_dict[tmp_str] = statistics.pstdev(tmp_list)
+            self.__aggregate_operation_dict[tmp_str] = statistics.pstdev(
+                tmp_list)
 
         for key in self.__group_by_dict.keys():
-            tmp_list = self.__extract_list_specific_header(input_header, self.__group_by_dict[key])
+            tmp_list = self.__extract_list_specific_header(
+                input_header, self.__group_by_dict[key])
             if len(tmp_list) != 0:
-                self.__aggregate_operation_dict[key + " || STD"] = statistics.pstdev(tmp_list)
+                self.__aggregate_operation_dict[key
+                                                + " || STD"] = statistics.pstdev(tmp_list)
 
-    def clear_cache_data(self):
+    def clear_cache_data(self) -> None:
         del self.__cache_data
         self.__cache_data = self.__data
         self.__where_conditions = ""
@@ -295,7 +312,7 @@ class PsuedoSQLFromCSV(object):
         return tmp_dict[op](arg1, arg2)
 
     @property
-    def header(self):
+    def header(self) -> list:
         return self.__header
 
     @header.setter
@@ -303,7 +320,7 @@ class PsuedoSQLFromCSV(object):
         self.__header = header
 
     @property
-    def data(self):
+    def data(self) -> list:
         return self.__data
 
     @data.setter
@@ -311,15 +328,15 @@ class PsuedoSQLFromCSV(object):
         self.__data = data
 
     @property
-    def original_data(self):
+    def original_data(self) -> list:
         return self.__original_data
 
     @property
-    def cache_data(self):
+    def cache_data(self) -> list:
         return self.__cache_data
 
     @property
-    def dtype(self):
+    def dtype(self) -> dict:
         return self.__header_data_type_dict
 
     @dtype.setter
@@ -327,17 +344,17 @@ class PsuedoSQLFromCSV(object):
         self.__header_data_type_dict = data_type
 
     @property
-    def condition_where(self):
+    def condition_where(self) -> str:
         return self.__where_conditions
 
     @property
-    def condition_group_by(self):
+    def condition_group_by(self) -> str:
         return self.__group_by_conditions
 
     @property
-    def cache_dict(self):
+    def cache_dict(self) -> dict:
         return self.__group_by_dict
 
     @property
-    def aggregate_operation_dict(self):
+    def aggregate_operation_dict(self) -> dict:
         return self.__aggregate_operation_dict

@@ -1,5 +1,6 @@
 import pymysql
 import pandas as pd
+import os
 from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import create_engine
@@ -26,15 +27,15 @@ class Transfer2SQLDB(object):
         tmp_db_info = 'mysql+mysqlconnector://' + data_base_info["user"] + ':' + data_base_info["password"] + '@' + \
             data_base_info["host"] + ':' + \
             str(data_base_info["port"]) + '/' + \
-            data_base_info["db"] + '?charset=UTF8'
+            data_base_info["db"] + '?charset=utf8'
         self.__connect_for_pd = create_engine(tmp_db_info)
 
-    def delete_table(self, table_name):
+    def delete_table(self, table_name: str) -> None:
         tmp_command = "drop table " + table_name
         self.__cursor.execute(tmp_command)
         print("Succeed to delete", table_name)
 
-    def show_tables(self):
+    def get_tables(self) -> list:
         tmp_list = list()
         tmp_command = "show tables;"
         self.__cursor.execute(tmp_command)
@@ -42,7 +43,9 @@ class Transfer2SQLDB(object):
             tmp_list.append(x["Tables_in_" + self.__db.db.decode("utf-8")])
         return tmp_list
 
-    def create_table(self, table_name, input_pseudosql_or_df, if_exists="replace", index=False, dtype=None):
+    def create_table(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, if_exists="replace", index=False, dtype=None, backup=False) -> None:
+        
+        self.__write_meta_table_meta_info(table_name)
 
         if type(input_pseudosql_or_df) == type(pd.DataFrame()):
             input_pseudosql_or_df.to_sql(
@@ -58,22 +61,31 @@ class Transfer2SQLDB(object):
                 table_name, self.__field_type_dict)
             print(tmp_command)
             self.__cursor.execute(tmp_command)
-            self.__insert_data(table_name, input_pseudosql_or_df.data)
+            self.__insert_data(table_name, input_pseudosql_or_df)
             self.__db.commit()
+        
+        if backup is True:
+            self.__backup_table(table_name)
 
-    def bring_data_from_table(self, table_name=None):
+    def bring_data_from_table(self, table_name: str) -> pd.DataFrame:
         self.__get_data_type(table_name)
         if table_name is not None:
             self.__cursor.execute("select * from " + table_name)
         tmp_tuple = self.__cursor.fetchall()
         return pd.DataFrame(tmp_tuple)
 
-    def execute(self, command):
+    def execute(self, command: str) -> pd.DataFrame:
         self.__cursor.execute(command)
         tmp_list = self.__cursor.fetchall()
         return pd.DataFrame(tmp_list)
 
-    def insert_data(self, table_name, input_pseudosql_or_df, field_type_dict=None, if_exists="append", index=False, dtype=None):
+    def insert_data(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, field_type_dict=None, if_exists="append", index=False, dtype=None, backup=False):
+        
+        self.__write_meta_table_meta_info(table_name)
+        
+        if backup is True:
+            self.backup_table(table_name)
+            
         if type(input_pseudosql_or_df) == type(pd.DataFrame()):
             input_pseudosql_or_df.to_sql(
                 con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype)
@@ -83,7 +95,7 @@ class Transfer2SQLDB(object):
 
     def __insert_data(self, input_table_name, input_pseudosql_or_df):
 
-        #if len(self.__field_type_dict) == 0:
+        # if len(self.__field_type_dict) == 0:
         #    self.__set_field_type_dict(input_pseudosql_or_df)
 
         tmp_char_type_list = [x for x in self.__field_type_dict.keys(
@@ -134,24 +146,38 @@ class Transfer2SQLDB(object):
         tmp_type_dict = dict()
         for tmp_dict in tmp_list:
             tmp_type_dict[tmp_dict["Field"]] = tmp_dict["Type"]
-        
 
         return tmp_type_dict
 
     def __check_if_exist(self, table_name: str) -> bool:
-        if table_name in self.show_tables():
+        if table_name in self.get_tables():
             return True
         else:
             return False
-
+    
+    def __make_table_history_table(self) -> None:
+        self.__cursor.execute("create table table_history (time DATETIME, name VARCHAR(30), action VARCHAR(20)) DEFAULT CHARSET=UTF8MB4;")
+        #self.__cursor.execute("create table table_history (name VARCHAR(30), action VARCHAR(20)) DEFAULT CHARSET=UTF8MB4;")
+        
     def __write_meta_table_meta_info(self, table_name: str) -> None:
+        if not self.__check_if_exist("table_history"):
+            self.__make_table_history_table()
+            
         tmp_now = datetime.now()
+        tmp_meta_info_table = "table_history"
         tmp_etc = ""
         if self.__check_if_exist(table_name):
             tmp_etc = "modify"
         else:
             tmp_etc = "create"
-        # tmp_before_line =
+        template_str = "insert into table_history(time, name, action) values (%s, %s, %s);"
+        #result_str = "insert into " + tmp_meta_info_table + "(name, action) values (\"test\", \"test\");"
+        self.__cursor.executemany(template_str, [[tmp_now, table_name, tmp_etc]])
+    
+    def backup_table(self, table_name:str) -> None:
+        tmp_path = os.environ["DATA_BACKUP"] + "/" + table_name + datetime.now().strftime("%Y%m%d%H%M") + ".csv"
+        self.bring_data_from_table(table_name).to_csv(tmp_path, index=False)
+        
 
     @staticmethod
     def __get_create_table_command(table_name, header_type_dict):
@@ -177,7 +203,7 @@ class Transfer2SQLDB(object):
         return tmp_dict
 
     @property
-    def dtype(self):
+    def dtype(self) -> dict:
         return self.__field_type_dict
 
     @dtype.setter
@@ -185,12 +211,8 @@ class Transfer2SQLDB(object):
         self.__field_type_dict = input_dtype_dict
 
     @property
-    def data_base_info(self):
+    def data_base_info(self) -> dict:
         return self.__data_base_info
-
-    @property
-    def db(self):
-        return self.db
 
     @property
     def cursor(self):

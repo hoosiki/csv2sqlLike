@@ -34,7 +34,7 @@ setup(
     author='Junsang Park',
     author_email='publichey@gmail.com',
     url='https://github.com/hoosiki/csv2sqlLike',
-    version='1.0.8',
+    version='1.1.3',
     long_description=readme,
     long_description_content_type="text/markdown",
     description='Python functions for data analysis using python native container. Load data from csv files and deal with data like sql.',
