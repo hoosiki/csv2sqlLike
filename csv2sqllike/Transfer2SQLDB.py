@@ -65,7 +65,7 @@ class Transfer2SQLDB(object):
             self.__db.commit()
         
         if backup is True:
-            self.__backup_table(table_name)
+            self.backup_table(table_name)
 
     def bring_data_from_table(self, table_name: str) -> pd.DataFrame:
         self.__get_data_type(table_name)
