@@ -78,13 +78,13 @@ class Transfer2SQLDB(object):
             input_pseudosql_or_df.to_sql(
                 con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype)
         else:
-            self.__get_data_type(table_name)
+            self.__field_type_dict = self.__get_data_type(table_name)
             self.__insert_data(table_name, input_pseudosql_or_df)
 
     def __insert_data(self, input_table_name, input_pseudosql_or_df):
 
-        if len(self.__field_type_dict) == 0:
-            self.__set_field_type_dict(input_pseudosql_or_df)
+        #if len(self.__field_type_dict) == 0:
+        #    self.__set_field_type_dict(input_pseudosql_or_df)
 
         tmp_char_type_list = [x for x in self.__field_type_dict.keys(
         ) if "CHAR" in self.__field_type_dict[x]]
@@ -129,13 +129,14 @@ class Transfer2SQLDB(object):
             self.__field_type_dict = tmp_dict
 
     def __get_data_type(self, table_name):
-        self.execute("SHOW FIELDS FROM " + table_name)
+        self.__cursor.execute("SHOW FIELDS FROM " + table_name)
         tmp_list = self.__cursor.fetchall()
-        self.__field_type_dict = dict()
+        tmp_type_dict = dict()
         for tmp_dict in tmp_list:
-            self.__field_type_dict[tmp_dict["Field"]] = tmp_dict["Type"]
+            tmp_type_dict[tmp_dict["Field"]] = tmp_dict["Type"]
+        
 
-        return self.__field_type_dict
+        return tmp_type_dict
 
     def __check_if_exist(self, table_name: str) -> bool:
         if table_name in self.show_tables():
