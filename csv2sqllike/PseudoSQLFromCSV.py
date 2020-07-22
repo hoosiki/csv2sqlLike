@@ -8,36 +8,46 @@ from dateutil.parser import parse
 
 
 class PsuedoSQLFromCSV(object):
-
+    
     def __init__(self, file_path: str, sep=",", dtype=None, encoding='utf-8'):
-        if self.__check_shape(file_path, sep, encoding=encoding):
-            self.__effective_header, header_num = self.__get_effective_headers_number(
-                file_path, sep)
+        if file_path == "":
+            self.__header_data_type_dict = dict()
+            self.__header = list()
+            self.__data = list()
+            self.__cache_data = self.__data
+            self.__group_by_dict = dict()
+            self.__where_conditions = ""
+            self.__group_by_conditions = ""
+            self.__aggregate_operation_dict = dict()
         else:
-            self.__effective_header = None
+            if self.__check_shape(file_path, sep, encoding=encoding):
+                self.__effective_header, header_num = self.__get_effective_headers_number(
+                    file_path, sep)
+            else:
+                self.__effective_header = None
 
-        with open(file_path, "r", encoding=encoding) as file:
-            self.__original_data = list(csv.reader(file))
-            self.__original_data[0] = list(
-                "_".join(x.lower().split(" ")) for x in self.__original_data[0])
+            with open(file_path, "r", encoding=encoding) as file:
+                self.__original_data = list(csv.reader(file))
+                self.__original_data[0] = list(
+                    "_".join(x.lower().split(" ")) for x in self.__original_data[0])
 
-        if dtype is None:
-            self.__header_data_type_dict = self.__get_header_data_type_dict(
-                self.__effective_header)
-        else:
-            self.__header_data_type_dict = dtype
-        self.__make_proper_type(self.__header_data_type_dict)
-        self.__header = self.__original_data[0]
-        self.__data = self.__original_data[1:]
-        self.__cache_data = self.__data
-        self.__group_by_dict = dict()
-        self.__where_conditions = ""
-        self.__group_by_conditions = ""
-        self.__aggregate_operation_dict = dict()
+            if dtype is None:
+                self.__header_data_type_dict = self.__get_header_data_type_dict(
+                    self.__effective_header)
+            else:
+                self.__header_data_type_dict = dtype
+            self.__make_proper_type(self.__header_data_type_dict)
+            self.__header = self.__original_data[0]
+            self.__data = self.__original_data[1:]
+            self.__cache_data = self.__data
+            self.__group_by_dict = dict()
+            self.__where_conditions = ""
+            self.__group_by_conditions = ""
+            self.__aggregate_operation_dict = dict()
 
-        print("Data Loaded : ")
-        for i in range(min(len(self.__original_data), 5)):
-            print(self.__original_data[i])
+            print("Data Loaded : ")
+            for i in range(min(len(self.__original_data), 5)):
+                print(self.__original_data[i])
 
     def save_data_to_csv(self, file_path: str, encoding='utf-8') -> None:
         tmp_file = open(file_path, "w", encoding=encoding)
