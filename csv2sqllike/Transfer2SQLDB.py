@@ -43,7 +43,7 @@ class Transfer2SQLDB(object):
             tmp_list.append(x["Tables_in_" + self.__db.db.decode("utf-8")])
         return tmp_list
 
-    def create_table(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, if_exists="replace", index=False, dtype=None, backup=False) -> None:
+    def create_table(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, if_exists="replace", index=False, dtype=None, backup=False, charlen=60) -> None:
         
         self.__write_meta_table_meta_info(table_name)
 
@@ -53,7 +53,7 @@ class Transfer2SQLDB(object):
 
         else:
             if dtype is None:
-                self.__set_field_type_dict(input_pseudosql_or_df)
+                self.__set_field_type_dict(input_pseudosql_or_df, charlen=charlen)
             else:
                 self.__field_type_dict = dtype
 
@@ -117,13 +117,13 @@ class Transfer2SQLDB(object):
 
         self.__cursor.executemany(result_str, input_pseudosql_or_df.data)
 
-    def __set_field_type_dict(self, input_pseudosql):
+    def __set_field_type_dict(self, input_pseudosql, charlen=60):
         if self.__field_type_dict is None or len(self.__field_type_dict) == 0:
             tmp_dict = dict()
             data_type_dict = input_pseudosql.dtype
             for key in data_type_dict.keys():
                 if data_type_dict[key] == "str":
-                    tmp_dict[key] = "VARCHAR(60)"
+                    tmp_dict[key] = "VARCHAR(" + str(charlen) + ")"
                 elif data_type_dict[key] == "float":
                     tpm_input = input(key + " float(1) or double(2)")
                     if tpm_input == "1":

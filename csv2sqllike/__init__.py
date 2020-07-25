@@ -26,7 +26,7 @@ def get_transfer(database_info_dict=None) -> Transfer2SQLDB:
     return transfer
 
 def to_list_from_df(df: pd.DataFrame, sep=',', dtype=None, encoding='utf-8'):
-    df.to_csv("./tmp_tmp.csv", index=False)
+    df.replace(to_replace=[r"\\t|\\n|\\r", "\t|\n|\r", "\n"], value=["","",""], regex=True).to_csv("./tmp_tmp.csv", index=False)
     tmp_pseudo_sql = get_data_from_csv(
         "./tmp_tmp.csv", sep=sep, dtype=dtype, encoding=encoding)
     os.remove("./tmp_tmp.csv")
