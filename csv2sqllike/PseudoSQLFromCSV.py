@@ -9,7 +9,7 @@ from dateutil.parser import parse
 
 class PsuedoSQLFromCSV(object):
     
-    def __init__(self, file_path: str, sep=",", dtype=None, encoding='utf-8'):
+    def __init__(self, file_path: str, sep=",", dtype=None, encoding='utf-8', line_terminator=None):
         if file_path == "":
             self.__header_data_type_dict = dict()
             self.__header = list()
@@ -20,16 +20,22 @@ class PsuedoSQLFromCSV(object):
             self.__group_by_conditions = ""
             self.__aggregate_operation_dict = dict()
         else:
-            if self.__check_shape(file_path, sep, encoding=encoding):
+            if self.__check_shape(file_path, line_terminator, sep, encoding=encoding):
                 self.__effective_header, header_num = self.__get_effective_headers_number(
-                    file_path, sep)
+                    file_path, sep, encoding, line_terminator)
             else:
                 self.__effective_header = None
 
-            with open(file_path, "r", encoding=encoding) as file:
-                self.__original_data = list(csv.reader(file))
-                self.__original_data[0] = list(
-                    "_".join(x.lower().split(" ")) for x in self.__original_data[0])
+            if line_terminator is None:
+                with open(file_path, "r", encoding=encoding) as file:
+                    self.__original_data = list(csv.reader(file))
+                    self.__original_data[0] = list(
+                        "_".join(x.lower().split(" ")) for x in self.__original_data[0])
+            else:
+                with open(file_path, "r", encoding=encoding, newline="") as file:
+                    self.__original_data = list(csv.reader(file.read().split(line_terminator)[:-1]))
+                    self.__original_data[0] = list(
+                        "_".join(x.lower().split(" ")) for x in self.__original_data[0])
 
             if dtype is None:
                 self.__header_data_type_dict = self.__get_header_data_type_dict(
@@ -57,28 +63,52 @@ class PsuedoSQLFromCSV(object):
         tmp_file.close()
 
     @staticmethod
-    def __get_effective_headers_number(file_path, sep=",", encoding='utf-8'):
-        with open(file_path, "r", encoding=encoding) as file:
-            tmp_list = list("_".join(x.lower().strip().split(" "))
-                            for x in file.readline().split(sep) if x != "")
+    def __get_effective_headers_number(file_path, sep=",", encoding='utf-8', line_terminator=None):
+        if line_terminator is None:
+            with open(file_path, "r", encoding=encoding) as file:
+                tmp_list = list("_".join(x.lower().strip().split(" "))
+                                for x in file.readline().split(sep) if x != "")
+        else:
+            with open(file_path, "r", encoding=encoding) as file:
+                tmp_line = file.readline()
+                tmp_line = tmp_line.replace(line_terminator.replace("\n", ""), "")
+                tmp_list = list("_".join(x.lower().strip().split(" "))
+                                for x in tmp_line.split(sep) if x != "")
+            
         return tmp_list, len(tmp_list)
 
-    def __check_shape(self, file_path, sep=",", encoding='utf-8'):
+    def __check_shape(self, file_path, line_terminator, sep=",", encoding='utf-8'):
         headers, num_headers = self.__get_effective_headers_number(
-            file_path, sep)
-        with open(file_path, "r", encoding=encoding) as file:
-            for line, data in enumerate(file):
-                if len(data.split(sep)) != num_headers:
-                    regex = re.compile(r',"(.*?)",')
-                    tmp_mo = regex.findall(data)
-                    if len(tmp_mo) != 0:
-                        for pattern in tmp_mo:
-                            data = data.replace(pattern, "")
-
+            file_path, sep, line_terminator=line_terminator)
+        if line_terminator is None:
+            with open(file_path, "r", encoding=encoding) as file:
+                for line, data in enumerate(file):
                     if len(data.split(sep)) != num_headers:
-                        print("Line", line + 1, "does not have consistant columns with", num_headers, "headers.",
-                              "This line has", len(data.split(sep)), "elements.")
-                        return False
+                        regex = re.compile(r',"(.*?)",')
+                        tmp_mo = regex.findall(data)
+                        if len(tmp_mo) != 0:
+                            for pattern in tmp_mo:
+                                data = data.replace(pattern, "")
+
+                        if len(data.split(sep)) != num_headers:
+                            print("Line", line + 1, "does not have consistant columns with", num_headers, "headers.",
+                                  "This line has", len(data.split(sep)), "elements.")
+                            return False
+        else:
+            with open(file_path, "r", encoding=encoding, newline="") as file:
+                file = file.read().split(line_terminator)[:-1]
+                for line, data in enumerate(file):
+                    if len(data.split(sep)) != num_headers:
+                        regex = re.compile(r',"(.*?)",')
+                        tmp_mo = regex.findall(data)
+                        if len(tmp_mo) != 0:
+                            for pattern in tmp_mo:
+                                data = data.replace(pattern, "")
+                        if len(data.split(sep)) != num_headers:
+                            print("Line", line + 1, "does not have consistant columns with", num_headers, "headers.",
+                                  "This line has", len(data.split(sep)), "elements.")
+                            return False
+            
         return True
 
     def delete_head(self, head: str) -> None:
@@ -124,7 +154,6 @@ class PsuedoSQLFromCSV(object):
             else:
                 tmp_str = tmp_header.ljust(100)
 
-            print(tmp_str)
             tmp_type = input(
                 'insert type(default type is str. options[" ":str, "1":int, "2":float, "3":date] : ')
             if tmp_type == "":
