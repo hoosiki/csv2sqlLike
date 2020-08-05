@@ -43,22 +43,24 @@ class Transfer2SQLDB(object):
             tmp_list.append(x["Tables_in_" + self.__db.db.decode("utf-8")])
         return tmp_list
 
-    def create_table(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, if_exists="replace", index=False, dtype=None, backup=False, charlen=60) -> None:
+    def create_table(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, if_exists="replace", index=False, dtype=None, backup=False, keys=list()) -> None:
         
         self.__write_meta_table_meta_info(table_name)
 
+
         if type(input_pseudosql_or_df) == type(pd.DataFrame()):
+            tmp_head_list = list(input_pseudosql_or_df.columns)
+            self.insert_head_dtypes(tmp_head_list)
+            tmp_command = self.__get_create_table_command(
+                table_name, input_pseudosql_or_df.columns, keys=keys)
+            print(tmp_command)
+            self.__cursor.execute(tmp_command)
             input_pseudosql_or_df.to_sql(
                 con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype)
 
         else:
-            if dtype is None:
-                self.__set_field_type_dict(input_pseudosql_or_df, charlen=charlen)
-            else:
-                self.__field_type_dict = dtype
-
-            tmp_command = self.__get_create_table_command(
-                table_name, self.__field_type_dict)
+            self.insert_head_dtypes(input_pseudosql_or_df.header)
+            tmp_command = self.__get_create_table_command(table_name, input_pseudosql_or_df.header, keys=keys)
             print(tmp_command)
             self.__cursor.execute(tmp_command)
             self.__insert_data(table_name, input_pseudosql_or_df)
@@ -68,7 +70,6 @@ class Transfer2SQLDB(object):
             self.backup_table(table_name)
 
     def bring_data_from_table(self, table_name: str) -> pd.DataFrame:
-        self.__get_data_type(table_name)
         if table_name is not None:
             self.__cursor.execute("select * from " + table_name)
         tmp_tuple = self.__cursor.fetchall()
@@ -79,7 +80,7 @@ class Transfer2SQLDB(object):
         tmp_list = self.__cursor.fetchall()
         return pd.DataFrame(tmp_list)
 
-    def insert_data(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, field_type_dict=None, if_exists="append", index=False, dtype=None, backup=False, exclude_history=False, keys=None):
+    def insert_data(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, field_type_dict=None, if_exists="append", index=False, dtype=None, backup=False, exclude_history=False):
         
         if exclude_history is False:
             self.__write_meta_table_meta_info(table_name)
@@ -89,20 +90,12 @@ class Transfer2SQLDB(object):
             
         if type(input_pseudosql_or_df) == type(pd.DataFrame()):
             input_pseudosql_or_df.to_sql(
-                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype, keys=keys)
+                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype)
         else:
-            self.__field_type_dict = self.__get_data_type(table_name)
             self.__insert_data(table_name, input_pseudosql_or_df)
 
     def __insert_data(self, input_table_name, input_pseudosql_or_df):
-
-        # if len(self.__field_type_dict) == 0:
-        #    self.__set_field_type_dict(input_pseudosql_or_df)
-
-        tmp_char_type_list = [x for x in self.__field_type_dict.keys(
-        ) if "CHAR" in self.__field_type_dict[x]]
-        tmp_header_list = [x for x in self.__field_type_dict.keys()]
-
+        tmp_header_list = input_pseudosql_or_df.header
         tmp_str_header = ""
         tmp_str_data = ""
         for index, key in enumerate(tmp_header_list):
@@ -113,42 +106,8 @@ class Transfer2SQLDB(object):
             tmp_str_data = tmp_str_data[:-2]
         result_str = "insert into " + input_table_name + \
             "(" + tmp_str_header + ") values (" + tmp_str_data + ");"
-
         print(result_str)
-
         self.__cursor.executemany(result_str, input_pseudosql_or_df.data)
-
-    def __set_field_type_dict(self, input_pseudosql, charlen=60):
-        if self.__field_type_dict is None or len(self.__field_type_dict) == 0:
-            tmp_dict = dict()
-            data_type_dict = input_pseudosql.dtype
-            for key in data_type_dict.keys():
-                if data_type_dict[key] == "str":
-                    tmp_dict[key] = "VARCHAR(" + str(charlen) + ")"
-                elif data_type_dict[key] == "float":
-                    tpm_input = input(key + " float(1) or double(2)")
-                    if tpm_input == "1":
-                        tmp_dict[key] = "FLOAT"
-                    elif tpm_input == "2":
-                        tmp_dict[key] = "DOUBLE"
-                elif data_type_dict[key] == "date":
-                    tpm_input = input("DATE(1) or DATETIME(2)")
-                    if tpm_input == "1":
-                        tmp_dict[key] = "DATE"
-                    elif tpm_input == "2":
-                        tmp_dict[key] = "DATETIME"
-                elif data_type_dict[key] == "int":
-                    tmp_dict[key] = "INT"
-            self.__field_type_dict = tmp_dict
-
-    def __get_data_type(self, table_name):
-        self.__cursor.execute("SHOW FIELDS FROM " + table_name)
-        tmp_list = self.__cursor.fetchall()
-        tmp_type_dict = dict()
-        for tmp_dict in tmp_list:
-            tmp_type_dict[tmp_dict["Field"]] = tmp_dict["Type"]
-
-        return tmp_type_dict
 
     def __check_if_exist(self, table_name: str) -> bool:
         if table_name in self.get_tables():
@@ -183,14 +142,48 @@ class Transfer2SQLDB(object):
         tmp_df = self.execute("describe " + table_name)
         tmp_num = tmp_df.to_numpy()
         return [x[0] for x in tmp_num], [x[1] for x in tmp_num]
+    
+    def delete_head_dtype(self, keyword_list: str) -> None:
+        for keyword in keyword_list:
+            self.execute("delete from metainfo_share.head_dtype where keyword=\"{}\"".format(keyword))
 
+    def add_head_dtype(self, keyword: str, dtype: str) -> None:
+        self.execute("insert into metainfo_share.head_dtype(keyword, dtype) values(\"{}\", \"{}\")".format(keyword, dtype))
 
-    @staticmethod
-    def __get_create_table_command(table_name, header_type_dict):
+    def insert_head_dtypes(self, keyword_list:list):
+        tmp_df = self.bring_data_from_table("metainfo_share.head_dtype")
+        tmp_df = tmp_df.to_numpy()
+        tmp_key_set = set(data[0] for data in tmp_df)
+        tmp_res_set = set(keyword_list) - tmp_key_set
+        if len(tmp_res_set) != 0:
+            for key in keyword_list:
+                if key not in tmp_res_set:
+                    continue
+                tmp_input = input("chose proper data type for {}: 1 - varchar(100), 2 - text, 3 - float, 4 - double, 5 - bigint, 6 - tinyint(1)".format(key))
+                if tmp_input == "1" or tmp_input == "":
+                    tmp_input = "varchar(100)"
+                elif tmp_input == "2":
+                    tmp_input = "text"
+                elif tmp_input == "3":
+                    tmp_input = "float"
+                elif tmp_input == "4":
+                    tmp_input = "double"
+                elif tmp_input == "5":
+                    tmp_input = "bigint"
+                elif tmp_input == "6":
+                    tmp_input = "tinyint(1)"
+                self.add_head_dtype(key, tmp_input)
+
+    def __get_create_table_command(self, table_name, head_list, keys=list()):
+        tmp_df = self.bring_data_from_table("metainfo_share.head_dtype")
+        tmp_df = tmp_df.to_numpy()
+        tmp_head_type_dict =  {data[0]:data[1] for data in tmp_df}
         tmp_str = ""
-        for key in header_type_dict.keys():
+        for key in head_list:
             tmp_str += "_".join(key.lower().split()) + \
-                " " + header_type_dict[key] + ", "
+                " " + tmp_head_type_dict[key] + ", "
+            if key in keys:
+                tmp_str = tmp_str[:-2] + " primary key, "
         if tmp_str != "":
             tmp_str = tmp_str[:-2]
         return "create table " + table_name + " (" + tmp_str + ") DEFAULT CHARSET=UTF8MB4;"
