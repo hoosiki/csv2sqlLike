@@ -79,16 +79,17 @@ class Transfer2SQLDB(object):
         tmp_list = self.__cursor.fetchall()
         return pd.DataFrame(tmp_list)
 
-    def insert_data(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, field_type_dict=None, if_exists="append", index=False, dtype=None, backup=False):
+    def insert_data(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, field_type_dict=None, if_exists="append", index=False, dtype=None, backup=False, exclude_history=False, keys=None):
         
-        self.__write_meta_table_meta_info(table_name)
+        if exclude_history is False:
+            self.__write_meta_table_meta_info(table_name)
         
         if backup is True:
             self.backup_table(table_name)
             
         if type(input_pseudosql_or_df) == type(pd.DataFrame()):
             input_pseudosql_or_df.to_sql(
-                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype)
+                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype, keys=keys)
         else:
             self.__field_type_dict = self.__get_data_type(table_name)
             self.__insert_data(table_name, input_pseudosql_or_df)
@@ -174,10 +175,15 @@ class Transfer2SQLDB(object):
         #result_str = "insert into " + tmp_meta_info_table + "(name, action) values (\"test\", \"test\");"
         self.__cursor.executemany(template_str, [[tmp_now, table_name, tmp_etc]])
     
-    def backup_table(self, table_name:str) -> None:
+    def backup_table(self, table_name: str) -> None:
         tmp_path = os.environ["DATA_BACKUP"] + "/" + table_name + datetime.now().strftime("%Y%m%d%H%M") + ".csv"
         self.bring_data_from_table(table_name).to_csv(tmp_path, index=False)
-        
+
+    def get_heads_dtype(self, table_name: str) -> (list, list):
+        tmp_df = self.execute("describe " + table_name)
+        tmp_num = tmp_df.to_numpy()
+        return [x[0] for x in tmp_num], [x[1] for x in tmp_num]
+
 
     @staticmethod
     def __get_create_table_command(table_name, header_type_dict):
