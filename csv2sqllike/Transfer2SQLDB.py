@@ -56,7 +56,7 @@ class Transfer2SQLDB(object):
             print(tmp_command)
             self.__cursor.execute(tmp_command)
             input_pseudosql_or_df.to_sql(
-                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype)
+                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype, method='multi')
 
         else:
             self.insert_head_dtypes(input_pseudosql_or_df.header)
