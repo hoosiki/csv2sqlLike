@@ -1,14 +1,12 @@
 import csv
-import datetime
 import re
-import copy
 import statistics
 from tqdm import tqdm
 from dateutil.parser import parse
 
 
 class PsuedoSQLFromCSV(object):
-    
+
     def __init__(self, file_path: str, sep=",", dtype=None, encoding='utf-8'):
         if file_path == "":
             self.__header_data_type_dict = dict()
@@ -100,7 +98,7 @@ class PsuedoSQLFromCSV(object):
                 self.__data[i].append(None)
 
             tmp_type = input(
-                tmp_head + '\'s type(default type is str. options[" ":str, "1":int, "2":float, "3":date] : ')
+                '{}\'s type(default type is str. options[" ":str, "1":int, "2":float, "3":date] :'.format(tmp_head))
             if tmp_type == "":
                 self.__header_data_type_dict[tmp_head] = "str"
             else:
@@ -152,8 +150,7 @@ class PsuedoSQLFromCSV(object):
                                                                                        self.__original_data[line_num][
                                                                                            tmp_index])
                     except Exception as e:
-                        print("Line", line_num + 1,
-                              "seems no proper data type")
+                        print("Line {} seems no proper data type".format(line_num + 1))
                         print(e)
 
     @staticmethod
@@ -168,8 +165,7 @@ class PsuedoSQLFromCSV(object):
 
         tmp_list = condition.split(" ")
         if len(tmp_list) < 3:
-            print("Condition :", condition,
-                  "is not proper format for where function.")
+            print("Condition : {} is not proper format for where function.".format(condition))
             pass
         tmp_header = tmp_list[0]
         tmp_operator = tmp_list[1]
@@ -178,7 +174,7 @@ class PsuedoSQLFromCSV(object):
             tmp_compared_obj = self.__switch_type(
                 self.__header_data_type_dict[tmp_header], tmp_compared_obj)
         except Exception as e:
-            print("Failed to convert condition :", condition)
+            print("Failed to convert condition : {}".format(condition))
             print(e)
         tmp_index = self.__header.index(tmp_header)
         tmp_data_list = list()
@@ -197,7 +193,7 @@ class PsuedoSQLFromCSV(object):
     def group_by(self, input_header: str):
 
         if input_header not in self.__header:
-            print(input_header, "is not included in header")
+            print("{} is not included in header".format(input_header))
             return self
 
         if input_header in self.__group_by_conditions:
@@ -274,8 +270,8 @@ class PsuedoSQLFromCSV(object):
             tmp_list = self.__extract_list_specific_header(
                 input_header, self.__group_by_dict[key])
             if len(tmp_list) != 0:
-                self.__aggregate_operation_dict[key
-                                                + " || AVG"] = statistics.mean(tmp_list)
+                self.__aggregate_operation_dict[key +
+                                                " || AVG"] = statistics.mean(tmp_list)
 
     def aggregate_std(self, input_header):
         if input_header not in self.__header:
@@ -292,8 +288,8 @@ class PsuedoSQLFromCSV(object):
             tmp_list = self.__extract_list_specific_header(
                 input_header, self.__group_by_dict[key])
             if len(tmp_list) != 0:
-                self.__aggregate_operation_dict[key
-                                                + " || STD"] = statistics.pstdev(tmp_list)
+                self.__aggregate_operation_dict[key +
+                                                " || STD"] = statistics.pstdev(tmp_list)
 
     def clear_cache_data(self) -> None:
         del self.__cache_data
@@ -302,12 +298,14 @@ class PsuedoSQLFromCSV(object):
         self.__group_by_conditions = ""
         self.__group_by_dict.clear()
         self.__aggregate_operation_dict.clear()
-    
+
     def retrieve_newline(self) -> None:
-        target_index_list = list(self.__header.index(key) for key in self.__header_data_type_dict.keys() if self.__header_data_type_dict[key] == "str")
+        target_index_list = list(self.__header.index(key) for key in self.__header_data_type_dict.keys(
+        ) if self.__header_data_type_dict[key] == "str")
         for row_i in range(len(self.__data)):
             for col_i in target_index_list:
-                self.__data[row_i][col_i] = self.__data[row_i][col_i].replace("<newline>", "\n")
+                self.__data[row_i][col_i] = self.__data[row_i][col_i].replace(
+                    "<newline>", "\n")
 
     def __extract_list_specific_header(self, input_header, input_nested_list):
         tmp_index = self.__header.index(input_header)

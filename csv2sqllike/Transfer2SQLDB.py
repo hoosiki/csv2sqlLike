@@ -2,7 +2,6 @@ import pymysql
 import pandas as pd
 import os
 from datetime import datetime
-from collections import defaultdict
 from sqlalchemy import create_engine
 
 
@@ -24,27 +23,22 @@ class Transfer2SQLDB(object):
         self.__cursor = self.__db.cursor(pymysql.cursors.DictCursor)
         self.__field_type_dict = None
 
-        tmp_db_info = 'mysql+mysqlconnector://' + data_base_info["user"] + ':' + data_base_info["password"] + '@' + \
-                      data_base_info["host"] + ':' + \
-                      str(data_base_info["port"]) + '/' + \
-                      data_base_info["db"] + '?charset=utf8'
+        tmp_db_info = 'mysql+mysqlconnector://{0}:{1}@{2}:{3}/{4}?charset=utf8'.format(
+            data_base_info["user"], data_base_info["password"], data_base_info["host"], str(data_base_info["port"]),
+            data_base_info["db"])
         self.__connect_for_pd = create_engine(tmp_db_info)
 
     def delete_table(self, table_name: str) -> None:
-        tmp_command = "drop table " + table_name
+        tmp_command = "drop table {}".format(table_name)
         self.__cursor.execute(tmp_command)
-        print("Succeed to delete", table_name)
+        print("Succeed to delete {}".format(table_name))
 
     def get_tables(self) -> list:
-        tmp_list = list()
-        tmp_command = "show tables;"
-        self.__cursor.execute(tmp_command)
-        for x in self.__cursor.fetchall():
-            tmp_list.append(x["Tables_in_" + self.__db.db.decode("utf-8")])
-        return tmp_list
+        self.__cursor.execute("show tables")
+        return list(x["Tables_in_{}".format(self.__db.db.decode("utf-8"))] for x in self.__cursor.fetchall())
 
-    def create_table(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, if_exists="replace", index=False,
-                     dtype=None, backup=False, keys=list()) -> None:
+    def create_table(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, if_exists="append", index=False,
+                     dtype=None, backup=False, keys=None) -> None:
 
         self.__write_meta_table_meta_info(table_name)
 
@@ -56,11 +50,13 @@ class Transfer2SQLDB(object):
             print(tmp_command)
             self.__cursor.execute(tmp_command)
             input_pseudosql_or_df.to_sql(
-                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype, method='multi')
+                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype,
+                method='multi')
 
         else:
             self.insert_head_dtypes(input_pseudosql_or_df.header)
-            tmp_command = self.__get_create_table_command(table_name, input_pseudosql_or_df.header, keys=keys)
+            tmp_command = self.__get_create_table_command(
+                table_name, input_pseudosql_or_df.header, keys=keys)
             print(tmp_command)
             self.__cursor.execute(tmp_command)
             self.__insert_data(table_name, input_pseudosql_or_df)
@@ -91,7 +87,8 @@ class Transfer2SQLDB(object):
 
         if type(input_pseudosql_or_df) == type(pd.DataFrame()):
             input_pseudosql_or_df.to_sql(
-                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype, method='multi')
+                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype,
+                method='multi')
         else:
             self.__insert_data(table_name, input_pseudosql_or_df)
 
@@ -105,7 +102,7 @@ class Transfer2SQLDB(object):
         if tmp_str_header != "":
             tmp_str_header = tmp_str_header[:-2]
             tmp_str_data = tmp_str_data[:-2]
-        result_str = "insert into " + input_table_name + \
+        result_str = "replace into " + input_table_name + \
                      "(" + tmp_str_header + ") values (" + tmp_str_data + ");"
         print(result_str)
         self.__cursor.executemany(result_str, input_pseudosql_or_df.data)
@@ -134,10 +131,12 @@ class Transfer2SQLDB(object):
             tmp_etc = "create"
         template_str = "insert into table_history(time, name, action) values (%s, %s, %s);"
         # result_str = "insert into " + tmp_meta_info_table + "(name, action) values (\"test\", \"test\");"
-        self.__cursor.executemany(template_str, [[tmp_now, table_name, tmp_etc]])
+        self.__cursor.executemany(
+            template_str, [[tmp_now, table_name, tmp_etc]])
 
     def backup_table(self, table_name: str) -> None:
-        tmp_path = os.environ["DATA_BACKUP"] + "/" + table_name + datetime.now().strftime("%Y%m%d%H%M") + ".csv"
+        tmp_path = os.environ["DATA_BACKUP"] + "/" + table_name + \
+                   datetime.now().strftime("%Y%m%d%H%M") + ".csv"
         self.bring_data_from_table(table_name).to_csv(tmp_path, index=False)
 
     def get_heads_dtype(self, table_name: str) -> (list, list):
@@ -147,11 +146,12 @@ class Transfer2SQLDB(object):
 
     def delete_head_dtype(self, keyword_list: str) -> None:
         for keyword in keyword_list:
-            self.execute("delete from metainfo_share.head_dtype where keyword=\"{}\"".format(keyword))
+            self.execute(
+                "delete from metainfo_share.head_dtype where keyword=\"{}\"".format(keyword))
 
     def add_head_dtype(self, keyword: str, dtype: str) -> None:
         self.execute(
-            "insert into metainfo_share.head_dtype(keyword, dtype) values(\"{}\", \"{}\")".format(keyword, dtype))
+            "replace into metainfo_share.head_dtype(keyword, dtype) values(\"{}\", \"{}\")".format(keyword, dtype))
 
     def insert_head_dtypes(self, keyword_list: list):
         tmp_df = self.bring_data_from_table("metainfo_share.head_dtype")
@@ -180,19 +180,20 @@ class Transfer2SQLDB(object):
                     tmp_input = "datetime"
                 self.add_head_dtype(key, tmp_input)
 
-    def __get_create_table_command(self, table_name, head_list, keys=list()):
+    def __get_create_table_command(self, table_name, head_list, keys=None):
         tmp_df = self.bring_data_from_table("metainfo_share.head_dtype")
         tmp_df = tmp_df.to_numpy()
-        tmp_head_type_dict = {data[0]: data[1] for data in tmp_df}
-        tmp_str = ""
-        for key in head_list:
-            tmp_str += "_".join(key.lower().split()) + \
-                       " " + tmp_head_type_dict[key] + ", "
-            if key in keys:
-                tmp_str = tmp_str[:-2] + " primary key, "
-        if tmp_str != "":
-            tmp_str = tmp_str[:-2]
-        return "create table " + table_name + " (" + tmp_str + ") DEFAULT CHARSET=UTF8MB4;"
+        tmp_head_type_dict = dict((data[0], data[1]) for data in tmp_df)
+        tmp_head_list = list("_".join(key.lower().split())
+                             for key in head_list)
+        tmp_col_type_str = ", ".join(
+            list("{} {}".format(head, tmp_head_type_dict[head]) for head in tmp_head_list))
+        if keys is None:
+            return "create table {0}({1}) DEFAULT CHARSET=UTF8MB4;".format(table_name, tmp_col_type_str)
+        else:
+            tmp_primary_key = "primary key({})".format(", ".join(keys))
+            return "create table {0}({1}, {2}) DEFAULT CHARSET=UTF8MB4;".format(table_name, tmp_col_type_str,
+                                                                                tmp_primary_key)
 
     @staticmethod
     def __set_data_base_info():
