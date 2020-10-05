@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from datetime import datetime
 from sqlalchemy import create_engine
+from .PseudoSQLFromCSV import PsuedoSQLFromCSV
 
 
 class Transfer2SQLDB(object):
@@ -26,7 +27,7 @@ class Transfer2SQLDB(object):
         tmp_db_info = 'mysql+mysqlconnector://{0}:{1}@{2}:{3}/{4}?charset=utf8'.format(
             data_base_info["user"], data_base_info["password"], data_base_info["host"], str(data_base_info["port"]),
             data_base_info["db"])
-        self.__connect_for_pd = create_engine(tmp_db_info)
+        self.__connect_for_pd = create_engine(tmp_db_info, pool_recycle=30)
 
     def delete_table(self, table_name: str) -> None:
         tmp_command = "drop table {}".format(table_name)
@@ -43,15 +44,16 @@ class Transfer2SQLDB(object):
         self.__write_meta_table_meta_info(table_name)
 
         if type(input_pseudosql_or_df) == type(pd.DataFrame()):
-            tmp_head_list = list(input_pseudosql_or_df.columns)
-            self.insert_head_dtypes(tmp_head_list)
+            tmp_sql = PsuedoSQLFromCSV("")
+            tmp_sql.header = list("_".join(key.lower().split()) for key in input_pseudosql_or_df.columns)
+            tmp_sql.data = input_pseudosql_or_df.to_numpy().tolist()
+            self.insert_head_dtypes(tmp_sql.header)
             tmp_command = self.__get_create_table_command(
                 table_name, input_pseudosql_or_df.columns, keys=keys)
             print(tmp_command)
             self.__cursor.execute(tmp_command)
-            input_pseudosql_or_df.to_sql(
-                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype,
-                method='multi')
+            self.__insert_data(table_name, tmp_sql)
+            self.__db.commit()
 
         else:
             self.insert_head_dtypes(input_pseudosql_or_df.header)
@@ -76,8 +78,7 @@ class Transfer2SQLDB(object):
         tmp_list = self.__cursor.fetchall()
         return pd.DataFrame(tmp_list)
 
-    def insert_data(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, field_type_dict=None,
-                    if_exists="append", index=False, dtype=None, backup=False, exclude_history=False):
+    def insert_data(self, table_name: str, input_pseudosql_or_df: pd.DataFrame, backup=False, exclude_history=False):
 
         if exclude_history is False:
             self.__write_meta_table_meta_info(table_name)
@@ -86,11 +87,14 @@ class Transfer2SQLDB(object):
             self.backup_table(table_name)
 
         if type(input_pseudosql_or_df) == type(pd.DataFrame()):
-            input_pseudosql_or_df.to_sql(
-                con=self.__connect_for_pd, name=table_name, if_exists=if_exists, index=index, dtype=dtype,
-                method='multi')
+            tmp_sql = PsuedoSQLFromCSV("")
+            tmp_sql.header = list("_".join(key.lower().split()) for key in input_pseudosql_or_df.columns)
+            tmp_sql.data = input_pseudosql_or_df.to_numpy().tolist()
+            self.__insert_data(table_name, tmp_sql)
+            self.__db.commit()
         else:
             self.__insert_data(table_name, input_pseudosql_or_df)
+            self.__db.commit()
 
     def __insert_data(self, input_table_name, input_pseudosql_or_df):
         tmp_header_list = input_pseudosql_or_df.header
@@ -116,7 +120,7 @@ class Transfer2SQLDB(object):
     def __make_table_history_table(self) -> None:
         self.__cursor.execute(
             "create table table_history (time DATETIME, name VARCHAR(30), action VARCHAR(20)) DEFAULT CHARSET=UTF8MB4;")
-        # self.__cursor.execute("create table table_history (name VARCHAR(30), action VARCHAR(20)) DEFAULT CHARSET=UTF8MB4;")
+        self.__db.commit()
 
     def __write_meta_table_meta_info(self, table_name: str) -> None:
         if not self.__check_if_exist("table_history"):
@@ -133,6 +137,7 @@ class Transfer2SQLDB(object):
         # result_str = "insert into " + tmp_meta_info_table + "(name, action) values (\"test\", \"test\");"
         self.__cursor.executemany(
             template_str, [[tmp_now, table_name, tmp_etc]])
+        self.__db.commit()
 
     def backup_table(self, table_name: str) -> None:
         tmp_path = os.environ["DATA_BACKUP"] + "/" + table_name + \
