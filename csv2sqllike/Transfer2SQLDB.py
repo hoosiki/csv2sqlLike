@@ -92,14 +92,15 @@ class Transfer2SQLDB(object):
 
         tmp_connection = pymysql.connect(**(self.__data_base_info))
         tmp_commands_list = command.replace("\n", "").split(";")
-
+        tmp_df = pd.DataFrame()
         try:
             with tmp_connection.cursor() as cursor:
                 for command in tmp_commands_list:
                     if command == "":
                         continue
                     cursor.execute(command)
-                tmp_df = pd.DataFrame(cursor.fetchall())
+                    if "select" in command:
+                        tmp_df = pd.DataFrame(cursor.fetchall())
             tmp_connection.commit()
         finally:
             tmp_connection.close()
@@ -111,10 +112,16 @@ class Transfer2SQLDB(object):
         if backup is True:
             self.backup_table(table_name)
 
-        if type(input_pseudosql_or_df) == type(pd.DataFrame()):
+        if isinstance(input_pseudosql_or_df, pd.DataFrame):
             tmp_sql = PsuedoSQLFromCSV("")
             tmp_sql.header = list("_".join(key.lower().split()) for key in input_pseudosql_or_df.columns)
+            tmp_shape = input_pseudosql_or_df.shape
             tmp_sql.data = input_pseudosql_or_df.to_numpy().tolist()
+            for i in range(tmp_shape[0]):
+                for j in range(tmp_shape[1]):
+                    if pd.isnan(tmp_sql.data[i][j]):
+                        tmp_sql.data[i][j] = None
+
         else:
             tmp_sql = input_pseudosql_or_df
 
@@ -224,7 +231,6 @@ class Transfer2SQLDB(object):
         template_str = "insert into table_history(time, name, action) values (%s, %s, %s);"
         cursor.executemany(
             template_str, [[tmp_now, table_name, tmp_action]])
-
 
     @property
     def db_info_dict(self):
